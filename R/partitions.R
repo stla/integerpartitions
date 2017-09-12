@@ -19,6 +19,15 @@
 .dominatedPartitions <- function(partition){
   .C("dominatedPartitionsR", partition=list(partition), result=list(0L))$result[[1L]]
 }
+.dominatingPartitions <- function(partition){
+  .C("dominatingPartitionsR", partition=list(partition), result=list(0L))$result[[1L]]
+}
+.partitionsWithKParts <- function(k, n){
+  .C("partitionsWithKPartsR", k=k, n=n, result=list(0L))$result[[1L]]
+}
+.countPartitionsWithKParts <- function(k, n){
+  .C("countPartitionsWithKPartsR", k=k, n=n, result=0L)$result
+}
 
 #' Ferrers diagram of a partition
 #'
@@ -62,7 +71,7 @@ dualPartition <- function(partition){
 #' @importFrom purrr map_int
 #'
 #' @examples
-#' countStandardYoungTableaux(c(5,3,1))
+#' countAutomorphisms(c(5,3,1))
 countAutomorphisms <- function(partition){
   partition <- purrr::map_int(partition, as.integer)
   if(.isPartition(partition)==0L){
@@ -85,7 +94,6 @@ countAutomorphisms <- function(partition){
 partitions <- function(n){
   .partitions(as.integer(n))
 }
-
 
 #' Dominance order
 #'
@@ -114,7 +122,8 @@ dominates <- function(partition1, partition2){
 
 #' Dominated partitions
 #'
-#' Returns the list of partitions dominated by the given partition.
+#' Returns the list of partitions of the same weight as the given partition and
+#' dominated by this partition.
 #'
 #' @param partition a partition
 #'
@@ -129,4 +138,56 @@ dominatedPartitions <- function(partition){
     warning("You have not entered a valid partition.")
   }
   .dominatedPartitions(partition)
+}
+
+#' Dominating partitions
+#'
+#' Returns the list of partitions of the same weight as the given partition and
+#' dominating this partition.
+#'
+#' @param partition a partition
+#'
+#' @return A list of partitions.
+#' @export
+#'
+#' @examples
+#' dominatingPartitions(c(3,2))
+dominatingPartitions <- function(partition){
+  partition <- purrr::map_int(partition, as.integer)
+  if(.isPartition(partition)==0L){
+    warning("You have not entered a valid partition.")
+  }
+  .dominatingPartitions(partition)
+}
+
+#' Partitions with a given number of parts
+#'
+#' Returns the list of partitions of a given weight and with a given number of parts.
+#'
+#' @param k number of parts
+#' @param n weight (the integer we partition)
+#'
+#' @return A list of partitions.
+#' @export
+#'
+#' @examples
+#' partitionsWithKParts(3, 9)
+partitionsWithKParts <- function(k, n){
+  .partitionsWithKParts(as.integer(k), as.integer(n))
+}
+
+#' Number of partitions with a given number of parts
+#'
+#' Counts the number of partitions of a given weight and with a given number of parts.
+#'
+#' @param k number of parts
+#' @param n weight (the integer we partition)
+#'
+#' @return A list of partitions.
+#' @export
+#'
+#' @examples
+#' countPartitionsWithKParts(3, 9)
+countPartitionsWithKParts <- function(k, n){
+  .countPartitionsWithKParts(as.integer(k), as.integer(n))
 }

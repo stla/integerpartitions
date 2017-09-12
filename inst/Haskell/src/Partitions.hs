@@ -1,15 +1,15 @@
+{-# LANGUAGE DataKinds                #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
-{-# LANGUAGE DataKinds #-}
 module Partitions where
-import Foreign
-import Foreign.C
-import Foreign.R (SEXP)
-import qualified Foreign.R.Type as R
-import qualified Data.Vector.SEXP as VS
-import Math.Combinat.Partitions.Integer
-import Language.R.Literal (mkProtectedSEXPVector)
-import Data.Singletons (sing)
-import Data.Bool (bool)
+import           Data.Bool                        (bool)
+import           Data.Singletons                  (sing)
+import qualified Data.Vector.SEXP                 as VS
+import           Foreign
+import           Foreign.C
+import           Foreign.R                        (SEXP)
+import qualified Foreign.R.Type                   as R
+import           Language.R.Literal               (mkProtectedSEXPVector)
+import           Math.Combinat.Partitions.Integer
 
 importPartition :: Ptr (SEXP s R.Int) -> IO (Partition)
 importPartition partition = do
@@ -70,7 +70,36 @@ foreign export ccall dominatedPartitionsR :: Ptr (SEXP s R.Int) -> Ptr (SEXP s R
 dominatedPartitionsR :: Ptr (SEXP s R.Int) -> Ptr (SEXP s R.Vector) -> IO ()
 dominatedPartitionsR partition result = do
   partition <- importPartition partition
-  let parts = map (map (fromIntegral))
+  let parts = map (map fromIntegral)
                 (map fromPartition (dominatedPartitions partition)) :: [[Int32]]
   poke result $ mkProtectedSEXPVector sing $
     (map (VS.toSEXP . VS.fromList) parts :: [SEXP s R.Int])
+
+foreign export ccall dominatingPartitionsR :: Ptr (SEXP s R.Int) -> Ptr (SEXP s R.Vector) -> IO ()
+dominatingPartitionsR :: Ptr (SEXP s R.Int) -> Ptr (SEXP s R.Vector) -> IO ()
+dominatingPartitionsR partition result = do
+  partition <- importPartition partition
+  let parts = map (map fromIntegral)
+                (_dominatingPartitions $ fromPartition partition) :: [[Int32]]
+  poke result $ mkProtectedSEXPVector sing $
+    (map (VS.toSEXP . VS.fromList) parts :: [SEXP s R.Int])
+
+foreign export ccall partitionsWithKPartsR :: Ptr CInt -> Ptr CInt -> Ptr (SEXP s R.Vector) -> IO ()
+partitionsWithKPartsR :: Ptr CInt -> Ptr CInt -> Ptr (SEXP s R.Vector) -> IO ()
+partitionsWithKPartsR k n result = do
+  k <- peek k
+  n <- peek n
+  let parts = map (map fromIntegral)
+                (map fromPartition
+                  (partitionsWithKParts (fromIntegral k) (fromIntegral n))) :: [[Int32]]
+  poke result $ mkProtectedSEXPVector sing $
+    (map (VS.toSEXP . VS.fromList) parts :: [SEXP s R.Int])
+
+foreign export ccall countPartitionsWithKPartsR ::
+                                       Ptr CInt -> Ptr CInt -> Ptr CInt -> IO ()
+countPartitionsWithKPartsR :: Ptr CInt -> Ptr CInt -> Ptr CInt -> IO ()
+countPartitionsWithKPartsR k n result = do
+  k <- peek k
+  n <- peek n
+  poke result $
+    fromIntegral (countPartitionsWithKParts (fromIntegral k) (fromIntegral n))
