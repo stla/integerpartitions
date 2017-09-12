@@ -10,6 +10,7 @@ import           Foreign.R                        (SEXP)
 import qualified Foreign.R.Type                   as R
 import           Language.R.Literal               (mkProtectedSEXPVector)
 import           Math.Combinat.Partitions.Integer
+import           Math.Combinat.Partitions.Skew
 
 importPartition :: Ptr (SEXP s R.Int) -> IO (Partition)
 importPartition partition = do
@@ -103,3 +104,49 @@ countPartitionsWithKPartsR k n result = do
   n <- peek n
   poke result $
     fromIntegral (countPartitionsWithKParts (fromIntegral k) (fromIntegral n))
+
+foreign export ccall isSubPartitionOfR :: Ptr (SEXP s R.Int) -> Ptr (SEXP s R.Int) -> Ptr CInt -> IO ()
+isSubPartitionOfR :: Ptr (SEXP s R.Int) -> Ptr (SEXP s R.Int) -> Ptr CInt -> IO ()
+isSubPartitionOfR partition1 partition2 result = do
+  partition1 <- importPartition partition1
+  partition2 <- importPartition partition2
+  poke result $ bool 0 1 (isSubPartitionOf partition1 partition2)
+
+--- ~# Skew Partitions #~ ---
+rListToSkewPartiton :: Ptr (SEXP s R.Int) -> Ptr CInt -> IO (SkewPartition)
+rListToSkewPartiton rlist l = do
+  l <- peek l
+  rlist <- peekArray (fromIntegral l :: Int) rlist
+  return $ SkewPartition $
+            map (\[x,y] -> ((fromIntegral x :: Int), (fromIntegral y :: Int)))
+              (map (VS.toList . VS.fromSEXP) rlist)
+
+skewPartitionToR :: SkewPartition -> IO (SEXP s R.Vector)
+skewPartitionToR (SkewPartition skewpartition) = do
+  let rlist = map (\(x,y) -> [(fromIntegral x :: Int32), (fromIntegral y :: Int32)])
+                skewpartition
+  return $ mkProtectedSEXPVector sing $
+                 (map (VS.toSEXP . VS.fromList) rlist :: [SEXP s R.Int])
+
+foreign export ccall skewPartitionWeightR :: Ptr (SEXP s R.Int) -> Ptr CInt -> Ptr CInt -> IO ()
+skewPartitionWeightR :: Ptr (SEXP s R.Int) -> Ptr CInt -> Ptr CInt -> IO ()
+skewPartitionWeightR rlist l result = do
+  skewpartition <- rListToSkewPartiton rlist l
+  poke result $ fromIntegral (skewPartitionWeight skewpartition)
+
+foreign export ccall mkSkewPartitionR :: Ptr (SEXP s R.Int) -> Ptr (SEXP s R.Int) -> Ptr (SEXP s R.Vector) -> IO ()
+mkSkewPartitionR :: Ptr (SEXP s R.Int) -> Ptr (SEXP s R.Int) -> Ptr (SEXP s R.Vector) -> IO ()
+mkSkewPartitionR partition1 partition2 result = do
+  partition1 <- importPartition partition1
+  partition2 <- importPartition partition2
+  let skewpartition = mkSkewPartition (partition1, partition2)
+  (>>=) (skewPartitionToR skewpartition) (poke result)
+
+foreign export ccall fromSkewPartitionR :: Ptr (SEXP s R.Int) -> Ptr CInt -> Ptr (SEXP s R.Vector) -> IO ()
+fromSkewPartitionR :: Ptr (SEXP s R.Int) -> Ptr CInt -> Ptr (SEXP s R.Vector) -> IO ()
+fromSkewPartitionR rlist l result = do
+  skewpartition <- rListToSkewPartiton rlist l
+  let (_outer, _inner) = fromSkewPartition skewpartition
+  let outer = (VS.toSEXP . VS.fromList) (map fromIntegral (fromPartition _outer) :: [Int32]) :: (SEXP s R.Int)
+  let inner = (VS.toSEXP . VS.fromList) (map fromIntegral (fromPartition _inner) :: [Int32]) :: (SEXP s R.Int)
+  poke result $ mkProtectedSEXPVector sing [outer, inner]
